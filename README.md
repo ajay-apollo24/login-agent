@@ -72,15 +72,15 @@ npm run agent
 2. **First login of the day**: Finds and clicks the "Clock-in" button if it appears
 3. **Subsequent logins**: Clock-in dialog may not appear (already clocked in) - this is normal
 4. Confirms successful clock-in when applicable
+5. **After attendance is marked**: Exits the application via user menu
 
 ### Evening Clock-out (7 PM)
 
 1. Logs into Adrenalin
 2. **If Clock-in dialog appears**: Clicks "I'll do this later" to dismiss it
 3. **Primary attempt**: Looks for direct "Clock-out" button on landing page
-4. **Fallback 1**: Tries Attendance menu for clock-out options
-5. **Fallback 2**: Uses user icon → "Exit application" → confirms "Yes" to clockout prompt
-6. **Last resort**: Scans all elements for "Exit application" or "Sign out"
+4. **Fallback**: Tries Attendance menu for clock-out options
+5. **After attendance process**: Always exits the application via user menu → "Exit application" → confirms "Yes"
 
 ## Time-based Logic
 
