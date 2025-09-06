@@ -1,0 +1,4 @@
+TARGET_URL=https://ahl247.myadrenalin.com/AdrenalinMax/#/
+LOGIN_USERNAME=<user name>
+LOGIN_PASSWORD=<user password>
+HEADLESS=false
