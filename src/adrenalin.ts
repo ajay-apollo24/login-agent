@@ -23,8 +23,8 @@ async function clickIfVisible(locator: MaybeLocator, options: { timeout?: number
   return false;
 }
 
-async function exitApplication(page: Page) {
-  console.log('Attempting to exit application...');
+async function exitApplicationMorning(page: Page) {
+  console.log('Attempting to exit application (morning mode)...');
   
   // Look for user icon/profile
   const userIcon = await waitForAnyVisible(page, [
@@ -52,19 +52,120 @@ async function exitApplication(page: Page) {
       await exitOption.click({ force: true });
       await page.waitForTimeout(1000);
 
-      // Handle confirmation prompt if it appears
-      const confirmButton = await waitForAnyVisible(page, [
-        page.getByRole('button', { name: /yes|confirm|ok/i }).first(),
-        page.getByText('Yes').first(),
-        page.locator('button').filter({ hasText: /yes|confirm|ok/i }).first()
-      ], 5000);
+      // Handle "Do you want to clockout?" prompt - Click "Exit" in morning
+      const clockoutPrompt = await waitForAnyVisible(page, [
+        page.getByText(/do you want to clockout/i).first(),
+        page.locator('*').filter({ hasText: /do you want to clockout/i }).first()
+      ], 3000);
 
-      if (confirmButton) {
-        console.log('Found confirmation prompt, clicking Yes...');
-        await confirmButton.click({ force: true });
+      if (clockoutPrompt) {
+        console.log('Found "Do you want to clockout?" prompt - clicking Exit (morning behavior)...');
+        const exitButton = await waitForAnyVisible(page, [
+          page.getByRole('button', { name: /exit/i }).first(),
+          page.getByText('Exit').first(),
+          page.locator('button').filter({ hasText: /^Exit$/i }).first()
+        ], 3000);
+
+        if (exitButton) {
+          await exitButton.click({ force: true });
+          console.log('Clicked Exit button for morning clockout prompt.');
+        } else {
+          console.log('Exit button not found, trying alternative buttons...');
+          // Fallback to any button that might be the exit option
+          const buttons = await page.locator('button').all();
+          for (const btn of buttons) {
+            const text = await btn.textContent();
+            if (text && /exit|no|cancel/i.test(text.trim())) {
+              await btn.click({ force: true });
+              console.log(`Clicked ${text} button as exit option.`);
+              break;
+            }
+          }
+        }
       }
       
-      console.log('Exit application completed.');
+      console.log('Morning exit application completed.');
+      return;
+    }
+  }
+
+  // Fallback: scan all elements for Exit application
+  console.log('User menu approach failed; scanning all elements for Exit application...');
+  const allElements = await page.locator('a, button, div, span').all();
+  for (const el of allElements) {
+    const text = (await el.textContent())?.toLowerCase() || '';
+    if (text.includes('exit application') || text.includes('sign out')) {
+      await el.click({ force: true });
+      console.log('Clicked Exit application via element scan.');
+      return;
+    }
+  }
+
+  console.log('Could not find Exit application option.');
+}
+
+async function exitApplicationEvening(page: Page) {
+  console.log('Attempting to exit application (evening mode)...');
+  
+  // Look for user icon/profile
+  const userIcon = await waitForAnyVisible(page, [
+    page.locator('[data-testid*="user"], [aria-label*="user"], [title*="user"]').first(),
+    page.locator('img[alt*="user"], img[alt*="profile"]').first(),
+    page.locator('button').filter({ hasText: /user|profile|account/i }).first(),
+    page.locator('[class*="user"], [class*="profile"]').first()
+  ], 5000);
+
+  if (userIcon) {
+    console.log('Found user icon, clicking...');
+    await userIcon.click({ force: true });
+    await page.waitForTimeout(1000); // Wait for dropdown/menu to appear
+
+    // Look for Exit application
+    const exitOption = await waitForAnyVisible(page, [
+      page.getByText('Exit application', { exact: true }).first(),
+      page.locator('*').filter({ hasText: /^Exit application$/ }).first(),
+      page.getByRole('menuitem', { name: /exit application/i }).first(),
+      page.locator('a, button, div, span').filter({ hasText: /^Exit application$/ }).first()
+    ], 3000);
+
+    if (exitOption) {
+      console.log('Found Exit application option, clicking...');
+      await exitOption.click({ force: true });
+      await page.waitForTimeout(1000);
+
+      // Handle "Do you want to clockout?" prompt - Click "Yes" in evening
+      const clockoutPrompt = await waitForAnyVisible(page, [
+        page.getByText(/do you want to clockout/i).first(),
+        page.locator('*').filter({ hasText: /do you want to clockout/i }).first()
+      ], 3000);
+
+      if (clockoutPrompt) {
+        console.log('Found "Do you want to clockout?" prompt - clicking Yes (evening behavior)...');
+        const yesButton = await waitForAnyVisible(page, [
+          page.getByRole('button', { name: /yes/i }).first(),
+          page.getByText('Yes').first(),
+          page.locator('button').filter({ hasText: /^Yes$/i }).first()
+        ], 3000);
+
+        if (yesButton) {
+          await yesButton.click({ force: true });
+          console.log('Clicked Yes button for evening clockout.');
+        } else {
+          console.log('Yes button not found, trying alternative confirmation buttons...');
+          // Fallback to any button that might be the confirmation option
+          const buttons = await page.locator('button').all();
+          for (const btn of buttons) {
+            const text = await btn.textContent();
+            if (text && /yes|ok|confirm/i.test(text.trim())) {
+              await btn.click({ force: true });
+              console.log(`Clicked ${text} button as confirmation.`);
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log('Evening exit application completed.');
       return;
     }
   }
@@ -146,69 +247,115 @@ export async function doDailyActions(page: Page) {
 }
 
 export async function performClockIn(page: Page) {
-    console.log('Attempting clock-in...');
-    let attendanceMarked = false;
-  
-    // Primary attempt: look for a visible "Clock-in" / "Punch in" control on the landing page
+    console.log('Attempting morning clock-in...');
+    
+    // Look for automatic clock-in popup that appears after first login of the day
     const clockInBtn = page.getByRole('button', { name: /clock-?in|mark in|punch in/i }).first()
       .or(page.locator('button').filter({ hasText: /clock-?in|mark in|punch in/i }).first());
   
-    if (await clockInBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      try {
-        await Promise.all([
-          page.waitForResponse(r => r.ok() && /clock|punch|attendance/i.test(r.url()), { timeout: 10000 }),
-          clockInBtn.click({ force: true })
-        ]);
-        console.log('Clock-in triggered successfully from landing page.');
-        attendanceMarked = true;
-      } catch (error) {
-        console.log('Clock-in button clicked, but no response detected (may still be successful)');
-        attendanceMarked = true; // Assume successful
+    if (await clockInBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log('Clock-in popup found - clicking to mark attendance...');
+      
+      // Click the clock-in button
+      await clockInBtn.click({ force: true });
+      console.log('Clock-in button clicked, waiting for confirmation...');
+      
+      // Wait for the page to process the click
+      await page.waitForTimeout(3000);
+      
+      // Debug: Check what's on the page after clicking
+      console.log('=== DEBUG: Checking page content after clock-in click ===');
+      const allText = await page.locator('body').textContent();
+      console.log('Page contains text:', allText?.substring(0, 500) + '...');
+      
+      // Look for success messages or confirmation with broader patterns
+      const successIndicators = await waitForAnyVisible(page, [
+        page.getByText(/success|successful|marked|punched|clocked|attendance.*marked/i).first(),
+        page.getByText(/already.*clocked/i).first(),
+        page.getByText(/completed|done|confirmed/i).first(),
+        page.locator('[class*="success"], [class*="confirmation"], [class*="alert"]').first(),
+        page.locator('div, span, p').filter({ hasText: /success|marked|clocked/i }).first()
+      ], 5000);
+      
+      if (successIndicators) {
+        const confirmText = await successIndicators.textContent();
+        console.log('Clock-in confirmation found:', confirmText);
+      } else {
+        console.log('No explicit confirmation found. Checking if clock-in button disappeared...');
+        
+        // Check if the clock-in button is still visible (it might disappear after successful click)
+        const stillVisible = await clockInBtn.isVisible({ timeout: 1000 }).catch(() => false);
+        if (!stillVisible) {
+          console.log('Clock-in button disappeared - this might indicate success!');
+        } else {
+          console.log('Clock-in button still visible - click might not have worked.');
+          
+          // Try clicking again with different approach
+          console.log('Trying alternative click approach...');
+          await clockInBtn.click();
+          await page.waitForTimeout(2000);
+        }
+      }
+      
+      // Exit application after clock-in
+      console.log('Clock-in process completed, now exiting application...');
+      await exitApplicationMorning(page);
+      return;
+    }
+    
+    // If no clock-in popup appears, Adrenaline sometimes doesn't show it
+    console.log('No clock-in popup found after first login. This sometimes happens in Adrenaline.');
+    console.log('Exiting and will login again to trigger clock-in popup...');
+    
+    // Exit application first
+    await exitApplicationMorning(page);
+    
+    // Wait a moment before re-login
+    await page.waitForTimeout(2000);
+    
+    // Login again to trigger clock-in popup
+    console.log('Logging in again to trigger clock-in popup...');
+    await loginAdrenalin(page, process.env.TARGET_URL!, process.env.LOGIN_USERNAME!, process.env.LOGIN_PASSWORD!);
+    
+    // Look for clock-in popup again
+    const secondAttemptBtn = page.getByRole('button', { name: /clock-?in|mark in|punch in/i }).first()
+      .or(page.locator('button').filter({ hasText: /clock-?in|mark in|punch in/i }).first());
+    
+    if (await secondAttemptBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log('Clock-in popup found on second login - clicking to mark attendance...');
+      
+      // Click the clock-in button
+      await secondAttemptBtn.click({ force: true });
+      console.log('Clock-in button clicked on second attempt, waiting for confirmation...');
+      
+      // Wait for success indicators
+      await page.waitForTimeout(2000);
+      
+      // Look for success messages or confirmation
+      const successIndicators = await waitForAnyVisible(page, [
+        page.getByText(/success|successful|marked|punched|clocked|attendance.*marked/i).first(),
+        page.getByText(/already.*clocked/i).first(),
+        page.locator('[class*="success"], [class*="confirmation"]').first()
+      ], 5000);
+      
+      if (successIndicators) {
+        console.log('Clock-in confirmation found on second attempt - attendance marked successfully!');
+      } else {
+        console.log('No explicit confirmation found on second attempt, but button was clicked.');
+        await page.waitForTimeout(3000);
       }
     } else {
-      // Fallback: navigate into Attendance module and retry
-      console.log('Clock-in button not found on landing; trying Attendance menu...');
-      const attendanceMenu = page.getByRole('link', { name: /attendance/i }).first()
-        .or(page.getByText(/attendance/i).first());
-  
-      if (await attendanceMenu.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await attendanceMenu.click({ force: true });
-        await page.waitForLoadState('networkidle');
-  
-        const menuClockIn = page.getByRole('button', { name: /clock-?in|mark in|punch in/i }).first()
-          .or(page.locator('button').filter({ hasText: /clock-?in|mark in|punch in/i }).first());
-  
-        if (await menuClockIn.isVisible({ timeout: 3000 }).catch(() => false)) {
-          try {
-            await Promise.all([
-              page.waitForResponse(r => r.ok() && /clock|punch|attendance/i.test(r.url()), { timeout: 10000 }),
-              menuClockIn.click({ force: true })
-            ]);
-            console.log('Clock-in via Attendance menu triggered.');
-            attendanceMarked = true;
-          } catch (error) {
-            console.log('Clock-in button clicked via Attendance menu, but no response detected (may still be successful)');
-            attendanceMarked = true; // Assume successful
-          }
-        } else {
-          console.log('No Clock-in control under Attendance. Assuming already clocked-in.');
-        }
-      } else {
-        console.log('Attendance menu not visible. Assuming already clocked-in.');
-      }
+      console.log('Still no clock-in popup on second login. May already be clocked in.');
     }
-
-    // Exit application after attendance is marked
-    if (attendanceMarked) {
-      console.log('Clock-in completed, now exiting application...');
-      await exitApplication(page);
-    }
+    
+    // Final exit
+    console.log('Morning clock-in process completed, exiting application...');
+    await exitApplicationMorning(page);
   }
 
   export async function performClockOut(page: Page) {
-    console.log('Attempting clock-out...');
-    let attendanceMarked = false;
-  
+    console.log('Attempting evening clock-out...');
+    
     // Step 0: Handle Clock-in dialog if it appears (common in evening)
     console.log('Checking if Clock-in dialog appears...');
     const clockInDialog = await waitForAnyVisible(page, [
@@ -245,57 +392,12 @@ export async function performClockIn(page: Page) {
       }
     }
   
-    // Step 1: Primary attempt - look for a "Clock-out / Punch out" control on the landing page
-    const clockOutBtn = page.getByRole('button', { name: /clock-?out|mark out|punch out/i }).first()
-      .or(page.locator('button').filter({ hasText: /clock-?out|mark out|punch out/i }).first());
-  
-    if (await clockOutBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      try {
-        await Promise.all([
-          page.waitForResponse(r => r.ok() && /clock|punch|attendance|logout/i.test(r.url()), { timeout: 10000 }),
-          clockOutBtn.click({ force: true })
-        ]);
-        console.log('Clock-out triggered successfully from landing page.');
-        attendanceMarked = true;
-      } catch (error) {
-        console.log('Clock-out button clicked, but no response detected (may still be successful)');
-        attendanceMarked = true; // Assume successful
-      }
-    } else {
-      // Step 2: Fallback - try Attendance menu
-      console.log('Clock-out button not found on landing; trying Attendance menu...');
-      const attendanceMenu = page.getByRole('link', { name: /attendance/i }).first()
-        .or(page.getByText(/attendance/i).first());
-  
-      if (await attendanceMenu.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await attendanceMenu.click({ force: true });
-        await page.waitForLoadState('networkidle');
-  
-        const menuClockOut = page.getByRole('button', { name: /clock-?out|mark out|punch out/i }).first()
-          .or(page.locator('button').filter({ hasText: /clock-?out|mark out|punch out/i }).first());
-  
-        if (await menuClockOut.isVisible({ timeout: 3000 }).catch(() => false)) {
-          try {
-            await Promise.all([
-              page.waitForResponse(r => r.ok() && /clock|punch|attendance|logout/i.test(r.url()), { timeout: 10000 }),
-              menuClockOut.click({ force: true })
-            ]);
-            console.log('Clock-out via Attendance menu triggered.');
-            attendanceMarked = true;
-          } catch (error) {
-            console.log('Clock-out button clicked via Attendance menu, but no response detected (may still be successful)');
-            attendanceMarked = true; // Assume successful
-          }
-        } else {
-          console.log('No Clock-out control under Attendance. Will proceed to exit application.');
-        }
-      } else {
-        console.log('Attendance menu not visible. Will proceed to exit application.');
-      }
-    }
-
-    // Always exit application after clock-out attempt (this serves as both clock-out method and exit)
-    console.log('Clock-out process completed, now exiting application...');
-    await exitApplication(page);
+    // In evening, the main goal is to clock-out via the exit process
+    // The "Do you want to clockout?" prompt during exit serves as the clock-out mechanism
+    console.log('Evening clock-out: proceeding directly to exit application...');
+    console.log('Clock-out will happen when we click "Yes" to the clockout prompt during exit.');
+    
+    // Exit application - this will trigger the clockout prompt where we click "Yes"
+    await exitApplicationEvening(page);
   }
 
