@@ -1,0 +1,78 @@
+name: Manual Adrenaline Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - clockin
+        - clockout
+        - test
+      debug:
+        description: 'Enable debug mode (non-headless)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  TARGET_URL: ${{ secrets.TARGET_URL }}
+  LOGIN_USERNAME: ${{ secrets.LOGIN_USERNAME }}
+  LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+  HEADLESS: ${{ github.event.inputs.debug == 'false' }}
+
+jobs:
+  manual-adrenaline:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright browsers
+      run: npx playwright install chromium --with-deps
+      
+    - name: Run Adrenaline Agent
+      run: |
+        echo "Running manual action: ${{ github.event.inputs.action }}"
+        echo "Debug mode: ${{ github.event.inputs.debug }}"
+        echo "Headless: ${{ env.HEADLESS }}"
+        
+        case "${{ github.event.inputs.action }}" in
+          "clockin")
+            npm run clockin
+            ;;
+          "clockout")
+            npm run clockout
+            ;;
+          "test")
+            echo "Running test - just login and exit"
+            npm run agent
+            ;;
+          *)
+            npm run agent
+            ;;
+        esac
+        
+    - name: Upload screenshots and logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: execution-artifacts-${{ github.run_number }}
+        path: |
+          test-results/
+          *.log
+        retention-days: 7

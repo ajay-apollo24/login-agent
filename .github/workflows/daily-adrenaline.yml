@@ -1,0 +1,81 @@
+name: Daily Adrenaline Automation
+
+on:
+  schedule:
+    # Clock-in at 9:00 AM IST (3:30 AM UTC)
+    - cron: '30 3 * * 1-5'
+    # Clock-out at 7:00 PM IST (1:30 PM UTC)  
+    - cron: '30 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - clockin
+        - clockout
+
+env:
+  TARGET_URL: ${{ secrets.TARGET_URL }}
+  LOGIN_USERNAME: ${{ secrets.LOGIN_USERNAME }}
+  LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+  HEADLESS: true
+
+jobs:
+  adrenaline-automation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright browsers
+      run: npx playwright install chromium --with-deps
+      
+    - name: Determine action based on time
+      id: determine-action
+      run: |
+        if [ "${{ github.event.inputs.action }}" != "" ]; then
+          echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+        else
+          # Get current hour in IST
+          current_hour=$(TZ='Asia/Kolkata' date +%H)
+          if [ $current_hour -ge 6 ] && [ $current_hour -lt 12 ]; then
+            echo "action=clockin" >> $GITHUB_OUTPUT
+          elif [ $current_hour -ge 17 ] && [ $current_hour -lt 22 ]; then
+            echo "action=clockout" >> $GITHUB_OUTPUT
+          else
+            echo "action=auto" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+    - name: Run Adrenaline Agent
+      run: |
+        echo "Running action: ${{ steps.determine-action.outputs.action }}"
+        if [ "${{ steps.determine-action.outputs.action }}" = "clockin" ]; then
+          npm run clockin
+        elif [ "${{ steps.determine-action.outputs.action }}" = "clockout" ]; then
+          npm run clockout  
+        else
+          npm run agent
+        fi
+        
+    - name: Upload screenshots on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: failure-screenshots-${{ github.run_number }}
+        path: test-results/
+        retention-days: 7
