@@ -44,13 +44,27 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install chromium --with-deps
       
-    - name: Determine action based on time
+    - name: Check for holidays and determine action
       id: determine-action
       run: |
+        # Define holidays (YYYY-MM-DD format)
+        HOLIDAYS="2024-10-01 2024-10-02 2024-10-20 2024-12-25 2025-01-01 2025-01-26 2025-03-14 2025-03-31 2025-04-14 2025-04-18 2025-05-01 2025-08-15 2025-10-01 2025-10-02 2025-10-20 2025-11-01 2025-12-25"
+        
+        # Get current date in IST
+        current_date=$(TZ='Asia/Kolkata' date +%Y-%m-%d)
+        
+        # Check if today is a holiday
+        if echo "$HOLIDAYS" | grep -q "$current_date"; then
+          echo "🎉 Today ($current_date) is a holiday - skipping automation"
+          echo "action=skip" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Manual trigger override
         if [ "${{ github.event.inputs.action }}" != "" ]; then
           echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
         else
-          # Get current hour in IST
+          # Get current hour in IST for automatic scheduling
           current_hour=$(TZ='Asia/Kolkata' date +%H)
           if [ $current_hour -ge 6 ] && [ $current_hour -lt 12 ]; then
             echo "action=clockin" >> $GITHUB_OUTPUT
@@ -64,7 +78,10 @@ jobs:
     - name: Run Adrenaline Agent
       run: |
         echo "Running action: ${{ steps.determine-action.outputs.action }}"
-        if [ "${{ steps.determine-action.outputs.action }}" = "clockin" ]; then
+        if [ "${{ steps.determine-action.outputs.action }}" = "skip" ]; then
+          echo "🎉 Skipping automation due to holiday"
+          exit 0
+        elif [ "${{ steps.determine-action.outputs.action }}" = "clockin" ]; then
           npm run clockin
         elif [ "${{ steps.determine-action.outputs.action }}" = "clockout" ]; then
           npm run clockout  
