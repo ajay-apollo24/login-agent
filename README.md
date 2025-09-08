@@ -235,3 +235,4 @@ HEADLESS=false npm run clockin
 **Ready to automate your attendance?** Follow the Quick Start guide above! 🚀
 
 For detailed setup and troubleshooting, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+# Force workflow recognition - Mon Sep  8 09:07:55 IST 2025
