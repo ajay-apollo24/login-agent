@@ -1,0 +1,37 @@
+name: Check Schedule Status
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-schedule:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check current time and schedule
+      run: |
+        echo "=== TIME CHECK ==="
+        echo "Current UTC time: $(date -u)"
+        echo "Current IST time: $(TZ='Asia/Kolkata' date)"
+        echo "Current day of week: $(date +%u)"  # 1=Monday, 7=Sunday
+        echo ""
+        echo "=== SCHEDULE ANALYSIS ==="
+        echo "Your cron: '30 3 * * 1-5'"
+        echo "Should run at: 3:30 AM UTC = 9:00 AM IST"
+        echo "Days: Monday-Friday (1-5)"
+        echo ""
+        current_hour=$(TZ='Asia/Kolkata' date +%H)
+        current_day=$(date +%u)
+        echo "Current IST hour: $current_hour"
+        echo "Current day number: $current_day"
+        echo ""
+        if [ $current_day -ge 1 ] && [ $current_day -le 5 ]; then
+          echo "✅ Today is a weekday - schedule should work"
+        else
+          echo "❌ Today is weekend - schedule won't run"
+        fi
+        echo ""
+        echo "=== NEXT STEPS ==="
+        echo "1. Check Actions tab for 'Daily Adrenaline Automation'"
+        echo "2. Look for runs around 9:00 AM IST"
+        echo "3. If no runs, workflow might need to be enabled"
