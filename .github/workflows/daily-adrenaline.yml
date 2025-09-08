@@ -48,7 +48,7 @@ jobs:
       id: determine-action
       run: |
         # Define holidays (YYYY-MM-DD format)
-        HOLIDAYS="2024-10-01 2024-10-02 2024-10-20 2024-12-25 2025-01-01 2025-01-26 2025-03-14 2025-03-31 2025-04-14 2025-04-18 2025-05-01 2025-08-15 2025-10-01 2025-10-02 2025-10-20 2025-11-01 2025-12-25"
+        HOLIDAYS="2025-10-01 2025-10-02 2025-10-20 2025-12-25"
         
         # Get current date in IST
         current_date=$(TZ='Asia/Kolkata' date +%Y-%m-%d)
