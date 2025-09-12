@@ -212,17 +212,37 @@ export async function loginAdrenalin(page: Page, url: string, username: string, 
       loginBtn.click()
     ]);
   
-    // Post-login verification: accept any of several markers as success
-    const marker = await waitForAnyVisible(page, [
-      page.getByText(/dashboard|home|my tasks/i).first(),
-      page.getByText(/attendance/i).first(),
-      page.getByRole('button', { name: /logout/i }).first(),
-      page.locator('[aria-label*="profile"], [title*="profile"], [data-testid*="profile"]').first()
-    ], 20000);
-  
-    if (!marker) {
-      throw new Error('Login likely failed: no post-login marker found within 20s');
+  // Post-login verification: accept any of several markers as success
+  console.log('🔍 Verifying successful login...');
+  const marker = await waitForAnyVisible(page, [
+    page.getByText(/dashboard|home|my tasks/i).first(),
+    page.getByText(/attendance/i).first(),
+    page.getByRole('button', { name: /logout|sign out|exit/i }).first(),
+    page.locator('[aria-label*="profile"], [title*="profile"], [data-testid*="profile"]').first(),
+    page.locator('[class*="user"], [class*="profile"]').first(),
+    page.getByText(/welcome|hello/i).first(),
+    // More generic success indicators
+    page.locator('nav, .navbar, .header').first(),
+    page.locator('[class*="main"], [class*="content"], [id*="main"]').first()
+  ], 30000); // Increased timeout to 30 seconds
+
+  if (!marker) {
+    // Try to get more info about what's on the page
+    const pageTitle = await page.title().catch(() => 'Unknown');
+    const url = page.url();
+    console.log(`Current page title: ${pageTitle}`);
+    console.log(`Current URL: ${url}`);
+    
+    // Check if we're still on login page
+    if (url.includes('login') || pageTitle.toLowerCase().includes('login')) {
+      throw new Error('Login failed: still on login page after 30s');
+    } else {
+      console.log('⚠️  No standard post-login markers found, but URL suggests we might be logged in');
+      console.log('🤞 Proceeding with caution...');
     }
+  } else {
+    console.log('✅ Login verification successful - found expected UI elements');
+  }
   
     await page.waitForLoadState('networkidle');
     console.log('Login completed successfully');

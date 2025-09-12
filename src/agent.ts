@@ -10,26 +10,51 @@ async function main() {
   const args = process.argv.slice(2);
   const mode = args.find(arg => arg.startsWith('--mode='))?.split('=')[1];
 
-  const browser = await chromium.launch({ headless: process.env.HEADLESS !== 'false' });
-  const context = await browser.newContext({
-    locale: 'en-IN',
-    timezoneId: 'Asia/Kolkata'
-  });
-  const page = await context.newPage();
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-  try {
-    await loginAdrenalin(page, process.env.TARGET_URL!, process.env.LOGIN_USERNAME!, process.env.LOGIN_PASSWORD!);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`🚀 Attempt ${attempt}/${maxRetries}`);
     
-    if (mode === 'clockin') {
-      await performClockIn(page);
-    } else if (mode === 'clockout') {
-      await performClockOut(page);
-    } else {
-      await doDailyActions(page);
+    const browser = await chromium.launch({ headless: process.env.HEADLESS !== 'false' });
+    const context = await browser.newContext({
+      locale: 'en-IN',
+      timezoneId: 'Asia/Kolkata'
+    });
+    const page = await context.newPage();
+
+    try {
+      await loginAdrenalin(page, process.env.TARGET_URL!, process.env.LOGIN_USERNAME!, process.env.LOGIN_PASSWORD!);
+      
+      if (mode === 'clockin') {
+        await performClockIn(page);
+      } else if (mode === 'clockout') {
+        await performClockOut(page);
+      } else {
+        await doDailyActions(page);
+      }
+      
+      console.log(`✅ Success on attempt ${attempt}`);
+      await browser.close();
+      return; // Success - exit the retry loop
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ Attempt ${attempt} failed:`, error);
+      
+      await browser.close();
+      
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 10; // 10s, 20s, 30s delays
+        console.log(`⏳ Waiting ${waitTime}s before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+      }
     }
-  } finally {
-    await browser.close();
   }
+  
+  // If we get here, all retries failed
+  console.error(`💥 All ${maxRetries} attempts failed. Last error:`);
+  throw lastError;
 }
 
 main().catch((err) => {
