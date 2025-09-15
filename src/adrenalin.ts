@@ -26,12 +26,22 @@ async function clickIfVisible(locator: MaybeLocator, options: { timeout?: number
 async function exitApplicationMorning(page: Page) {
   console.log('Attempting to exit application (morning mode)...');
   
-  // Look for user icon/profile
+  // Debug: Take a screenshot and log page content
+  console.log('=== DEBUG: Current page state ===');
+  const pageTitle = await page.title().catch(() => 'Unknown');
+  const url = page.url();
+  console.log(`Page title: ${pageTitle}`);
+  console.log(`Current URL: ${url}`);
+  
+  // Look for user icon/profile with expanded selectors
   const userIcon = await waitForAnyVisible(page, [
     page.locator('[data-testid*="user"], [aria-label*="user"], [title*="user"]').first(),
     page.locator('img[alt*="user"], img[alt*="profile"]').first(),
     page.locator('button').filter({ hasText: /user|profile|account/i }).first(),
-    page.locator('[class*="user"], [class*="profile"]').first()
+    page.locator('[class*="user"], [class*="profile"]').first(),
+    page.locator('svg').filter({ hasText: /user|profile/i }).first(),
+    page.locator('[role="button"]').filter({ hasText: /user|profile|account/i }).first(),
+    page.locator('div').filter({ hasText: /user|profile|account/i }).first()
   ], 5000);
 
   if (userIcon) {
@@ -207,23 +217,37 @@ export async function loginAdrenalin(page: Page, url: string, username: string, 
     const loginBtn = page.getByRole('button', { name: /sign ?in|log ?in|submit/i }).first()
       .or(page.locator('button[type="submit"]').first());
   
-    await Promise.all([
-      page.waitForLoadState('networkidle'),
-      loginBtn.click()
-    ]);
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {
+      console.log('No navigation detected, but continuing...');
+    }),
+    loginBtn.click()
+  ]);
   
-  // Post-login verification: accept any of several markers as success
+  // Wait for page to actually change after login
+  await page.waitForTimeout(3000);
+  
+  // Post-login verification: be more strict about what constitutes successful login
   console.log('🔍 Verifying successful login...');
+  const currentUrl = page.url();
+  console.log(`Current URL after login: ${currentUrl}`);
+  
+  // First check: make sure we're not still on login page
+  if (currentUrl.includes('login') || currentUrl.includes('signin')) {
+    console.log('❌ Still on login page, login may have failed');
+    throw new Error('Login failed: still on login page');
+  }
+  
+  // Look for specific post-login indicators (more strict)
   const marker = await waitForAnyVisible(page, [
-    page.getByText(/dashboard|home|my tasks/i).first(),
-    page.getByText(/attendance/i).first(),
+    page.getByText(/dashboard|home/i).first(),
+    page.getByText(/welcome/i).first(),
     page.getByRole('button', { name: /logout|sign out|exit/i }).first(),
     page.locator('[aria-label*="profile"], [title*="profile"], [data-testid*="profile"]').first(),
     page.locator('[class*="user"], [class*="profile"]').first(),
-    page.getByText(/welcome|hello/i).first(),
-    // More generic success indicators
-    page.locator('nav, .navbar, .header').first(),
-    page.locator('[class*="main"], [class*="content"], [id*="main"]').first()
+    // Look for user menu or profile elements that indicate we're logged in
+    page.locator('[data-testid*="user"], [aria-label*="user"], [title*="user"]').first(),
+    page.locator('img[alt*="user"], img[alt*="profile"]').first()
   ], 30000); // Increased timeout to 30 seconds
 
   if (!marker) {
