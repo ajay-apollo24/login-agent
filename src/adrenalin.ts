@@ -44,6 +44,7 @@ async function exitApplicationMorning(page: Page) {
     page.locator('div').filter({ hasText: /user|profile|account/i }).first()
   ], 5000);
 
+  /*
   if (userIcon) {
     console.log('Found user icon, clicking...');
     await userIcon.click({ force: true });
@@ -110,6 +111,7 @@ async function exitApplicationMorning(page: Page) {
       return;
     }
   }
+    */
 
   console.log('Could not find Exit application option.');
 }
