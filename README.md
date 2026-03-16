@@ -236,3 +236,5 @@ HEADLESS=false npm run clockin
 
 For detailed setup and troubleshooting, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 # Force workflow recognition - Mon Sep  8 09:07:55 IST 2025
+
+Fix some issues
