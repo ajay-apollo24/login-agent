@@ -3,9 +3,9 @@ name: Daily Adrenaline Automation
 on:
   schedule:
     # Clock-in at 9:00 AM IST (2:30 AM UTC - adjusted for actual timing)
-    - cron: '30 2 * * 1-5'
+    - cron: '30 1 * * 1-5'
     # Clock-out at 7:00 PM IST (12:30 PM UTC - adjusted for actual timing)  
-    - cron: '30 12 * * 1-5'
+    - cron: '30 13 * * 1-5'
   workflow_dispatch:
     inputs:
       action:
