@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { chromium } from '@playwright/test';
 import { loginAdrenalin, doDailyActions, performClockIn, performClockOut } from './adrenalin.ts';
 
+
 async function main() {
   const required = ['TARGET_URL', 'LOGIN_USERNAME', 'LOGIN_PASSWORD'];
   for (const k of required) if (!process.env[k]) throw new Error(`Missing env: ${k}`);
