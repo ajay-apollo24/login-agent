@@ -2,6 +2,7 @@
 
 A robust, intelligent automation system for Adrenalin attendance management with scheduled clock-in/clock-out at 9 AM and 7 PM daily. Now with **GitHub Actions support** for fully automated cloud execution!
 
+
 ## ✨ Features
 
 - 🤖 **GitHub Actions Integration**: Fully automated cloud execution - no local setup required!
